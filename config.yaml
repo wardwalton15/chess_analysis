@@ -1,0 +1,138 @@
+# Chess Analysis Project Configuration
+
+# Tournament Settings
+tournament:
+  name: "2024 FIDE Candidates Tournament"
+  year: 2024
+  start_date: "2024-04-04"
+  end_date: "2024-04-22"
+
+# Time Control Configuration
+# Different tournaments use different time controls - define them here
+time_controls:
+  # FIDE Candidates format (2024)
+  candidates_2024:
+    name: "FIDE Candidates 2024"
+    base_time: 7200  # 120 minutes in seconds
+    increment_type: "delay_bonus"  # Options: "fischer", "delay_bonus", "bronstein", "none"
+    increment_start_move: 41  # Increment starts after move 40 (so on move 41)
+    increment_seconds: 30
+    bonus_time: 1800  # 30 minutes added after move 40
+    has_increment_before_bonus: false
+
+  # Standard rapid format
+  rapid_standard:
+    name: "Standard Rapid"
+    base_time: 1500  # 25 minutes
+    increment_type: "fischer"
+    increment_start_move: 1
+    increment_seconds: 10
+    bonus_time: 0
+    has_increment_before_bonus: false
+
+  # World Cup Classical
+  world_cup_classical:
+    name: "FIDE World Cup Classical"
+    base_time: 5400  # 90 minutes
+    increment_type: "delay_bonus"
+    increment_start_move: 41
+    increment_seconds: 30
+    bonus_time: 1800  # 30 minutes
+    has_increment_before_bonus: false
+
+  # Grand Chess Tour format (example with Fischer from move 1)
+  gct_classical:
+    name: "Grand Chess Tour Classical"
+    base_time: 5400  # 90 minutes
+    increment_type: "fischer"
+    increment_start_move: 1
+    increment_seconds: 30
+    bonus_time: 0
+    has_increment_before_bonus: true
+
+  # Future Candidates 2026 (adjust when announced)
+  candidates_2026:
+    name: "FIDE Candidates 2026"
+    base_time: 7200  # Assuming same as 2024
+    increment_type: "delay_bonus"
+    increment_start_move: 41
+    increment_seconds: 30
+    bonus_time: 1800
+    has_increment_before_bonus: false
+
+# Analysis Settings
+analysis:
+  # Time-based thresholds
+  time_thresholds:
+    opening_moves: 10  # Analyze first N moves for "opening time"
+    long_think_minutes: 20  # Minutes to qualify as "long think"
+    medium_think_minutes: 10  # Secondary threshold
+
+  # Prep detection settings
+  prep_detection:
+    method: "hybrid"  # Options: "percentage", "absolute", "hybrid"
+    percentage_threshold: 0.05  # 5% of remaining time
+    absolute_threshold_minutes: 10  # 10 minutes absolute
+    min_move_number: 4  # Don't count prep exit before move 4
+
+  # Engine analysis settings
+  engine:
+    path: "stockfish"  # Path to Stockfish binary (or just "stockfish" if in PATH)
+    threads: 4
+    hash_mb: 1024
+    depth: 20  # Search depth
+    time_per_position: 0.1  # Seconds per position
+    skip_opening_moves: 8  # Skip engine analysis for first N moves
+
+  # Performance metrics
+  performance:
+    comeback_threshold: 200  # Centipawns (e.g., -200 = -2.0)
+    blown_lead_threshold: 200
+    winning_advantage: 150  # cp to be considered "winning"
+
+# Visualization Settings
+visualization:
+  # TikTok-optimized formats
+  output_formats:
+    portrait:
+      width: 1080
+      height: 1920
+      dpi: 300
+    square:
+      width: 1080
+      height: 1080
+      dpi: 300
+    landscape:
+      width: 1920
+      height: 1080
+      dpi: 300
+
+  # Color scheme (dark mode for TikTok)
+  colors:
+    background: "#0a0a0a"
+    foreground: "#ffffff"
+    accent: "#4a9eff"
+    white_pieces: "#e8e8e8"
+    black_pieces: "#404040"
+    grid: "#333333"
+
+  # Font settings
+  fonts:
+    title_size: 28
+    subtitle_size: 14
+    label_size: 13
+    annotation_size: 11
+    title_weight: "bold"
+
+# File paths
+paths:
+  data_raw: "data/raw"
+  data_processed: "data/processed"
+  cache: "data/cache"
+  outputs: "outputs/graphs"
+  reports: "outputs/reports"
+
+# Active tournament (change this to switch between tournaments)
+active_tournament:
+  time_control: "candidates_2024"  # Reference to time_controls key
+  pgn_file: "2024-fide-candidates-chess-tournament.pgn"
