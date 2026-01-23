@@ -107,6 +107,42 @@ class Config:
         """Absolute time threshold for prep exit (in minutes)."""
         return self.get("analysis", "prep_detection", "absolute_threshold_minutes", default=10)
 
+    # Engine analysis settings
+    @property
+    def engine_path(self) -> str:
+        """Path to Stockfish binary."""
+        return self.get("analysis", "engine", "path", default="stockfish")
+
+    @property
+    def engine_depth(self) -> int:
+        """Search depth for engine analysis."""
+        return self.get("analysis", "engine", "depth", default=20)
+
+    @property
+    def engine_threads(self) -> int:
+        """Number of CPU threads for engine."""
+        return self.get("analysis", "engine", "threads", default=4)
+
+    @property
+    def engine_hash_mb(self) -> int:
+        """Hash table size in MB."""
+        return self.get("analysis", "engine", "hash_mb", default=1024)
+
+    @property
+    def skip_opening_moves(self) -> int:
+        """Number of opening moves to skip in engine analysis."""
+        return self.get("analysis", "engine", "skip_opening_moves", default=8)
+
+    @property
+    def comeback_threshold(self) -> int:
+        """Centipawn threshold for comeback detection."""
+        return self.get("analysis", "performance", "comeback_threshold", default=200)
+
+    @property
+    def blown_lead_threshold(self) -> int:
+        """Centipawn threshold for blown lead detection."""
+        return self.get("analysis", "performance", "blown_lead_threshold", default=200)
+
     # Visualization settings
     @property
     def viz_colors(self) -> Dict[str, str]:
