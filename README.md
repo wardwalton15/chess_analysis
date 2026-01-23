@@ -188,8 +188,8 @@ time_controls:
 - [x] PGN parsing with time controls
 - [x] Opening time analysis
 - [x] Long think detection
-- [ ] Prep detection algorithm
-- [ ] Stockfish integration
+- [x] Prep detection algorithm
+- [x] Stockfish integration
 - [ ] Accuracy calculations
 - [ ] Comeback/blown lead detection
 - [ ] Visualization templates
