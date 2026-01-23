@@ -65,19 +65,21 @@ analysis:
   # Time-based thresholds
   time_thresholds:
     opening_moves: 10  # Analyze first N moves for "opening time"
-    long_think_minutes: 20  # Minutes to qualify as "long think"
+    long_think_minutes: 20  # Minutes to qualify as "long think" (absolute)
     medium_think_minutes: 10  # Secondary threshold
+    long_think_pct: 0.10  # 10% of total time = long think (percentage-based)
+    time_pressure_pct: 0.05  # Under 5% remaining = time pressure
 
   # Prep detection settings
   prep_detection:
     method: "hybrid"  # Options: "percentage", "absolute", "hybrid"
-    percentage_threshold: 0.05  # 5% of remaining time
+    percentage_threshold: 0.05  # 5% of total time triggers prep exit
     absolute_threshold_minutes: 10  # 10 minutes absolute
     min_move_number: 4  # Don't count prep exit before move 4
 
   # Engine analysis settings
   engine:
-    path: "stockfish"  # Path to Stockfish binary (or just "stockfish" if in PATH)
+    path: "C:/Users/drawn/Documents/Stockfish/stockfish/stockfish-windows-x86-64-avx2.exe"  # Path to Stockfish binary (or just "stockfish" if in PATH)
     threads: 4
     hash_mb: 1024
     depth: 20  # Search depth
@@ -89,6 +91,16 @@ analysis:
     comeback_threshold: 200  # Centipawns (e.g., -200 = -2.0)
     blown_lead_threshold: 200
     winning_advantage: 150  # cp to be considered "winning"
+
+  # Dominance metrics
+  dominance:
+    advantage_threshold: 50  # cp to be considered "ahead" (+0.5)
+    dominance_threshold: 60  # Score to count as "dominated game"
+
+  # Resilience metrics
+  resilience:
+    pressure_threshold: -150  # cp to be considered "under pressure" (-1.5)
+    collapse_cpl: 200  # Additional CPL loss = collapse (blunder when worse)
 
 # Visualization Settings
 visualization:

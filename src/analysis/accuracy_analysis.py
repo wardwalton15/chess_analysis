@@ -4,11 +4,14 @@ Includes player stats, comeback detection, blown lead detection,
 and accuracy correlation with thinking time.
 """
 
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, TYPE_CHECKING
 from dataclasses import dataclass, field
 from collections import defaultdict
 
 from .engine_analysis import GameEvaluation, MoveEvaluation, calculate_accuracy
+
+if TYPE_CHECKING:
+    from ..parsers.pgn_parser import ParsedGame
 
 
 @dataclass
@@ -93,6 +96,51 @@ class BlownLeadRecord:
     result: str
     collapse_moves: int  # Moves from best position to draw/loss
     played_as_white: bool
+
+
+@dataclass
+class TimePressureAccuracy:
+    """Accuracy statistics when under time pressure."""
+    player_name: str
+    moves_under_threshold: int = 0
+    total_cpl_under_pressure: float = 0.0
+    blunders_under_pressure: int = 0
+    mistakes_under_pressure: int = 0
+
+    @property
+    def avg_cpl_under_pressure(self) -> float:
+        """Average CPL when under time pressure."""
+        return self.total_cpl_under_pressure / self.moves_under_threshold if self.moves_under_threshold > 0 else 0.0
+
+    @property
+    def accuracy_under_pressure(self) -> float:
+        """Accuracy percentage when under time pressure."""
+        return calculate_accuracy(self.avg_cpl_under_pressure)
+
+
+@dataclass
+class LongThinkAccuracy:
+    """Accuracy statistics on long thinks."""
+    player_name: str
+    long_think_count: int = 0
+    total_cpl_on_long_thinks: float = 0.0
+    blunders_on_long_thinks: int = 0
+    perfect_moves: int = 0  # CPL < 5
+
+    @property
+    def avg_cpl_on_long_thinks(self) -> float:
+        """Average CPL on long thinks."""
+        return self.total_cpl_on_long_thinks / self.long_think_count if self.long_think_count > 0 else 0.0
+
+    @property
+    def accuracy_on_long_thinks(self) -> float:
+        """Accuracy percentage on long thinks."""
+        return calculate_accuracy(self.avg_cpl_on_long_thinks)
+
+    @property
+    def perfect_rate(self) -> float:
+        """Percentage of long thinks that were near-perfect."""
+        return (self.perfect_moves / self.long_think_count * 100) if self.long_think_count > 0 else 0.0
 
 
 def calculate_player_accuracy(
@@ -282,6 +330,109 @@ def find_blown_leads(
     return blown_leads
 
 
+def calculate_time_pressure_accuracy(
+    game_evals: List[GameEvaluation],
+    games: List["ParsedGame"],
+    pct_threshold: float = 0.05,
+    base_time: int = 7200
+) -> Dict[str, TimePressureAccuracy]:
+    """
+    Calculate accuracy statistics for moves made under time pressure.
+
+    Args:
+        game_evals: List of game evaluations (with engine analysis)
+        games: List of parsed games (with clock data)
+        pct_threshold: Percentage threshold (0.05 = 5% remaining)
+        base_time: Base time in seconds for percentage calculation
+
+    Returns:
+        Dict mapping player name to TimePressureAccuracy
+    """
+    stats: Dict[str, TimePressureAccuracy] = {}
+    threshold_seconds = base_time * pct_threshold
+
+    # Create a mapping from game_id to parsed game for clock data
+    game_map = {}
+    for game in games:
+        game_id = f"{game.metadata.white} vs {game.metadata.black} R{game.metadata.round}"
+        game_map[game_id] = game
+
+    for game_eval in game_evals:
+        # Get the corresponding parsed game with clock data
+        parsed_game = game_map.get(game_eval.game_id)
+        if not parsed_game:
+            continue
+
+        # Build move number -> clock remaining mapping
+        clock_data = {}
+        for move in parsed_game.moves:
+            key = (move.move_number, move.is_white)
+            clock_data[key] = move.clock_remaining
+
+        # Initialize players
+        for player in [game_eval.white_player, game_eval.black_player]:
+            if player not in stats:
+                stats[player] = TimePressureAccuracy(player_name=player)
+
+        # Check each evaluated move
+        for move_eval in game_eval.move_evaluations:
+            key = (move_eval.move_number, move_eval.is_white)
+            clock_remaining = clock_data.get(key)
+
+            if clock_remaining is not None and clock_remaining < threshold_seconds:
+                player = game_eval.white_player if move_eval.is_white else game_eval.black_player
+                stats[player].moves_under_threshold += 1
+                stats[player].total_cpl_under_pressure += move_eval.centipawn_loss
+
+                if move_eval.is_blunder:
+                    stats[player].blunders_under_pressure += 1
+                elif move_eval.is_mistake:
+                    stats[player].mistakes_under_pressure += 1
+
+    return stats
+
+
+def calculate_long_think_accuracy(
+    game_evals: List[GameEvaluation],
+    pct_threshold: float = 0.10,
+    base_time: int = 7200
+) -> Dict[str, LongThinkAccuracy]:
+    """
+    Calculate accuracy statistics for long thinks (>X% of total time).
+
+    Args:
+        game_evals: List of game evaluations
+        pct_threshold: Percentage threshold (0.10 = 10% of base time)
+        base_time: Base time in seconds
+
+    Returns:
+        Dict mapping player name to LongThinkAccuracy
+    """
+    stats: Dict[str, LongThinkAccuracy] = {}
+    threshold_seconds = base_time * pct_threshold
+
+    for game_eval in game_evals:
+        # Initialize players
+        for player in [game_eval.white_player, game_eval.black_player]:
+            if player not in stats:
+                stats[player] = LongThinkAccuracy(player_name=player)
+
+        for move_eval in game_eval.move_evaluations:
+            if move_eval.time_spent is not None and move_eval.time_spent >= threshold_seconds:
+                player = game_eval.white_player if move_eval.is_white else game_eval.black_player
+
+                stats[player].long_think_count += 1
+                stats[player].total_cpl_on_long_thinks += move_eval.centipawn_loss
+
+                if move_eval.is_blunder:
+                    stats[player].blunders_on_long_thinks += 1
+
+                if move_eval.centipawn_loss < 5:
+                    stats[player].perfect_moves += 1
+
+    return stats
+
+
 def _count_recovery_moves(
     move_evals: List[MoveEvaluation],
     worst_eval: int,
@@ -419,3 +570,72 @@ def print_blown_lead_report(blown_leads: List[BlownLeadRecord], top_n: int = 10)
         color = "White" if blown.played_as_white else "Black"
         print(f"{blown.player:<25} {eval_str:<12} {blown.result:<10} "
               f"{blown.opponent:<25} {color:<6}")
+
+
+def print_time_pressure_accuracy_report(
+    stats: Dict[str, TimePressureAccuracy],
+    pct_threshold: float = 0.05
+) -> None:
+    """Print formatted time pressure accuracy report."""
+    pct_display = int(pct_threshold * 100)
+
+    print("\n" + "=" * 100)
+    print(f"ACCURACY UNDER TIME PRESSURE (<{pct_display}% time remaining)")
+    print("=" * 100)
+
+    # Sort by moves under pressure
+    sorted_stats = sorted(
+        [s for s in stats.values() if s.moves_under_threshold > 0],
+        key=lambda x: x.moves_under_threshold,
+        reverse=True
+    )
+
+    if not sorted_stats:
+        print("\nNo moves found under time pressure threshold.")
+        return
+
+    print(f"\n{'Player':<25} {'Moves':<8} {'Accuracy':<10} {'Avg CPL':<10} {'Blunders':<10} {'Mistakes':<10}")
+    print("-" * 80)
+
+    for s in sorted_stats:
+        print(f"{s.player_name:<25} "
+              f"{s.moves_under_threshold:<8} "
+              f"{s.accuracy_under_pressure:>6.1f}%   "
+              f"{s.avg_cpl_under_pressure:>8.1f} "
+              f"{s.blunders_under_pressure:>8} "
+              f"{s.mistakes_under_pressure:>8}")
+
+
+def print_long_think_accuracy_report(
+    stats: Dict[str, LongThinkAccuracy],
+    pct_threshold: float = 0.10
+) -> None:
+    """Print formatted long think accuracy report."""
+    pct_display = int(pct_threshold * 100)
+
+    print("\n" + "=" * 100)
+    print(f"ACCURACY ON LONG THINKS (>{pct_display}% of total time)")
+    print("=" * 100)
+
+    # Sort by accuracy (highest first)
+    sorted_stats = sorted(
+        [s for s in stats.values() if s.long_think_count > 0],
+        key=lambda x: x.accuracy_on_long_thinks,
+        reverse=True
+    )
+
+    if not sorted_stats:
+        print("\nNo long thinks found.")
+        return
+
+    print(f"\n{'Player':<25} {'Count':<8} {'Accuracy':<10} {'Avg CPL':<10} {'Perfect':<10} {'Blunders':<10}")
+    print("-" * 85)
+
+    for s in sorted_stats:
+        perfect_str = f"{s.perfect_moves} ({s.perfect_rate:.0f}%)"
+        print(f"{s.player_name:<25} "
+              f"{s.long_think_count:<8} "
+              f"{s.accuracy_on_long_thinks:>6.1f}%   "
+              f"{s.avg_cpl_on_long_thinks:>8.1f} "
+              f"{perfect_str:<10} "
+              f"{s.blunders_on_long_thinks:>8}")
